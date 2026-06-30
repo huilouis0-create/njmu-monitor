@@ -218,8 +218,10 @@ async function main() {
       console.log(`   解析到 ${items.length} 条通知`);
       allItems.push(...items);
     } catch (e) {
-      console.error(`   ❌ 抓取失败: ${e.message}`);
-      errors.push({ site: site.name, error: e.message });
+   const errMsg = e.message || e.code || JSON.stringify(e);
+   console.error(`   ❌ 抓取失败: ${errMsg}`);
+   console.error(`      完整错误:`, e);
+   errors.push({ site: site.name, error: errMsg });
     }
   }
 
