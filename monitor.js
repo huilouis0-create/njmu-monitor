@@ -5,8 +5,8 @@
  *   1. 研究生招生网 - 招生动态: https://yjszs.njmu.edu.cn/10166/list.htm
  *   2. 研究生院 - 通知公告: https://yjsy.njmu.edu.cn/tzgg_19149/list.htm
  *
- * 修复要点：
- *   - 抓取失败不再当作“没有新通知”，会推送故障提醒并让 Actions 失败。
+ * 可靠性策略：
+ *   - 两个列表页并行抓取，单次短暂故障只记录，连续失败才告警。
  *   - 新通知只有在 PushPlus 推送成功后才写入 state，避免漏推。
  *   - 对列表中的近期通知抓取详情页内容指纹，同一个 URL 内容更新也会提醒。
  */
@@ -18,9 +18,15 @@ const path = require('path');
 const crypto = require('crypto');
 const { sendPushPlus } = require('./pushplus');
 
-const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 45000);
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 30000);
 const FETCH_RETRIES = Number(process.env.FETCH_RETRIES || 3);
+const RETRY_BASE_DELAY_MS = Number(process.env.RETRY_BASE_DELAY_MS || 5000);
+const FAILURE_ALERT_THRESHOLD = Number(process.env.FAILURE_ALERT_THRESHOLD || 2);
 const DETAIL_CHECK_LIMIT_PER_SITE = Number(process.env.DETAIL_CHECK_LIMIT_PER_SITE || 8);
+const DETAIL_REQUEST_TIMEOUT_MS = Number(process.env.DETAIL_REQUEST_TIMEOUT_MS || 12000);
+const DETAIL_FETCH_RETRIES = Number(process.env.DETAIL_FETCH_RETRIES || 1);
+const DETAIL_FETCH_CONCURRENCY = Number(process.env.DETAIL_FETCH_CONCURRENCY || 3);
+const MAX_REDIRECTS = 5;
 
 const SITES = [
   {
@@ -137,48 +143,115 @@ function dedupeItems(items) {
   });
 }
 
-function fetchUrl(url, attempt = 1) {
+function requestOnce(url, timeoutMs, redirectsLeft = MAX_REDIRECTS) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const client = urlObj.protocol === 'https:' ? https : http;
+    let settled = false;
+    let req;
+
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(overallTimer);
+      callback(value);
+    };
+
+    const overallTimer = setTimeout(() => {
+      const error = new Error(`request timeout after ${timeoutMs}ms`);
+      error.code = 'ETIMEDOUT';
+      req?.destroy(error);
+    }, timeoutMs);
+
     const options = {
       hostname: urlObj.hostname,
+      port: urlObj.port || undefined,
       path: urlObj.pathname + urlObj.search,
       method: 'GET',
       family: 4,
-      timeout: REQUEST_TIMEOUT_MS,
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 AppleWebKit monitor',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Cache-Control': 'no-cache',
       },
     };
 
-    const req = client.request(options, (res) => {
+    req = client.request(options, (res) => {
+      const statusCode = res.statusCode || 0;
+      if (statusCode >= 300 && statusCode < 400 && res.headers.location) {
+        res.resume();
+        if (redirectsLeft <= 0) {
+          finish(reject, new Error(`too many redirects for ${url}`));
+          return;
+        }
+
+        const redirectUrl = new URL(res.headers.location, url).href;
+        if (settled) return;
+        settled = true;
+        clearTimeout(overallTimer);
+        requestOnce(redirectUrl, timeoutMs, redirectsLeft - 1).then(resolve, reject);
+        return;
+      }
+
+      if (statusCode >= 400) {
+        res.resume();
+        finish(reject, new Error(`HTTP ${statusCode}`));
+        return;
+      }
+
       let data = '';
       res.setEncoding('utf8');
       res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        if (res.statusCode >= 400) {
-          reject(new Error(`HTTP ${res.statusCode}`));
-          return;
-        }
-        resolve(data);
-      });
+      res.on('end', () => finish(resolve, data));
+      res.on('error', (error) => finish(reject, error));
     });
 
-    req.on('error', (error) => reject(error));
-    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Request timeout after ${REQUEST_TIMEOUT_MS}ms`));
+    req.on('error', (error) => finish(reject, error));
+    req.setTimeout(timeoutMs, () => {
+      const error = new Error(`socket timeout after ${timeoutMs}ms`);
+      error.code = 'ETIMEDOUT';
+      req.destroy(error);
     });
     req.end();
-  }).catch(async (error) => {
-    if (attempt >= FETCH_RETRIES) throw error;
-    const delay = 3000 * attempt;
-    console.warn(`   第 ${attempt} 次抓取失败：${error.message}，${delay / 1000}s 后重试`);
-    await sleep(delay);
-    return fetchUrl(url, attempt + 1);
   });
+}
+
+function errorMessage(error) {
+  const message = error?.message || String(error);
+  return error?.code && !message.includes(error.code) ? `${error.code}: ${message}` : message;
+}
+
+async function fetchUrl(url, options = {}) {
+  const attempts = Math.max(1, Number(options.attempts ?? FETCH_RETRIES));
+  const timeoutMs = Math.max(1000, Number(options.timeoutMs ?? REQUEST_TIMEOUT_MS));
+  const label = options.label || url;
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const body = await requestOnce(url, timeoutMs);
+      if (options.validate) options.validate(body);
+      return body;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts) break;
+
+      const delay = RETRY_BASE_DELAY_MS * attempt;
+      console.warn(
+        `   ${label} 第 ${attempt}/${attempts} 次抓取失败：${errorMessage(error)}，` +
+          `${delay / 1000}s 后重试`
+      );
+      await sleep(delay);
+    }
+  }
+
+  const finalError = new Error(
+    `${label} 连续 ${attempts} 次抓取失败：${errorMessage(lastError)}`
+  );
+  finalError.code = lastError?.code;
+  throw finalError;
 }
 
 function makeKey(item) {
@@ -186,7 +259,7 @@ function makeKey(item) {
 }
 
 function loadState(filePath) {
-  const state = { seenSet: new Set(), records: {} };
+  const state = { seenSet: new Set(), records: {}, health: {} };
   try {
     if (!fs.existsSync(filePath)) return state;
 
@@ -205,6 +278,10 @@ function loadState(filePath) {
     if (data.items && typeof data.items === 'object') {
       state.records = data.items;
     }
+
+    if (data.health && typeof data.health === 'object') {
+      state.health = data.health;
+    }
   } catch (error) {
     console.error('读取 state.json 失败：', error.message);
   }
@@ -220,10 +297,16 @@ function saveState(filePath, state) {
     items[url] = state.records[url];
   }
 
+  const health = {};
+  for (const url of Object.keys(state.health || {}).sort()) {
+    health[url] = state.health[url];
+  }
+
   const data = JSON.stringify(
     {
       seen: [...state.seenSet].sort(),
       items,
+      health,
       updatedAt: new Date().toISOString(),
     },
     null,
@@ -232,21 +315,87 @@ function saveState(filePath, state) {
   fs.writeFileSync(filePath, data, 'utf8');
 }
 
+function updateSiteHealth(state, site, error, now, alertThreshold = FAILURE_ALERT_THRESHOLD) {
+  if (!state.health || typeof state.health !== 'object') state.health = {};
+
+  const previous = state.health[site.url] || {};
+  if (!error) {
+    const recovered = Number(previous.consecutiveFailures || 0) > 0;
+    state.health[site.url] = {
+      siteName: site.name,
+      consecutiveFailures: 0,
+      alertSent: false,
+      lastCheckedAt: now,
+      lastSuccessAt: now,
+      lastFailureAt: previous.lastFailureAt || null,
+      lastError: null,
+    };
+    return { consecutiveFailures: 0, persistent: false, shouldAlert: false, recovered };
+  }
+
+  const consecutiveFailures = Number(previous.consecutiveFailures || 0) + 1;
+  const alertSent = Boolean(previous.alertSent);
+  state.health[site.url] = {
+    siteName: site.name,
+    consecutiveFailures,
+    alertSent,
+    lastCheckedAt: now,
+    lastSuccessAt: previous.lastSuccessAt || null,
+    lastFailureAt: now,
+    lastError: errorMessage(error),
+  };
+
+  return {
+    consecutiveFailures,
+    persistent: consecutiveFailures >= alertThreshold,
+    shouldAlert: consecutiveFailures >= alertThreshold && !alertSent,
+    recovered: false,
+  };
+}
+
+function markSiteAlerted(state, siteUrl) {
+  if (state.health?.[siteUrl]) state.health[siteUrl].alertSent = true;
+}
+
+async function mapWithConcurrency(items, concurrency, worker) {
+  const limit = Math.max(1, Math.min(Number(concurrency) || 1, items.length || 1));
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      await worker(items[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => runWorker()));
+}
+
 async function enrichWithDetailFingerprints(items) {
   const counts = new Map();
+  const candidates = [];
+
   for (const item of items) {
     const count = counts.get(item.siteIndex) || 0;
     if (count >= DETAIL_CHECK_LIMIT_PER_SITE) continue;
     counts.set(item.siteIndex, count + 1);
+    candidates.push(item);
+  }
 
+  await mapWithConcurrency(candidates, DETAIL_FETCH_CONCURRENCY, async (item) => {
     try {
-      const detailHtml = await fetchUrl(item.url);
+      const detailHtml = await fetchUrl(item.url, {
+        attempts: DETAIL_FETCH_RETRIES,
+        timeoutMs: DETAIL_REQUEST_TIMEOUT_MS,
+        label: `详情页 ${item.url}`,
+      });
       item.contentHash = contentFingerprint(detailHtml);
     } catch (error) {
-      item.detailError = error.message || String(error);
+      item.detailError = errorMessage(error);
       console.warn(`   详情页指纹抓取失败：${item.title} - ${item.detailError}`);
     }
-  }
+  });
 }
 
 function buildMessage(items) {
@@ -270,9 +419,13 @@ function buildMessage(items) {
 }
 
 function buildErrorMessage(errors) {
-  let html = '<h3>南医大通知监控异常</h3><p>本次检查未能完整访问学校网站，请稍后重试或查看 Actions 日志。</p><ul>';
+  let html =
+    '<h3>南医大通知监控持续异常</h3>' +
+    '<p>学校网站已连续多轮无法访问，已排除单次网络抖动。程序会继续自动重试。</p><ul>';
   for (const error of errors) {
-    html += `<li>${error.site}: ${error.error}</li>`;
+    html +=
+      `<li>${error.site}：连续 ${error.consecutiveFailures} 轮失败` +
+      `<br><small>${error.error}</small></li>`;
   }
   html += '</ul>';
   return html;
@@ -300,20 +453,52 @@ async function main() {
 
   const allItems = [];
   const errors = [];
+  const now = new Date().toISOString();
 
-  for (const site of SITES) {
-    console.log(`\n正在检查：${site.name}`);
-    console.log(`   URL: ${site.url}`);
-    try {
-      const html = await fetchUrl(site.url);
-      const items = site.parse(html).map((item) => ({ ...item, siteIndex: site.siteIndex }));
-      console.log(`   解析到 ${items.length} 条通知`);
-      allItems.push(...items);
-    } catch (error) {
-      const message = error.message || error.code || String(error);
-      console.error(`   抓取失败：${message}`);
-      errors.push({ site: site.name, error: message });
+  const siteResults = await Promise.all(
+    SITES.map(async (site) => {
+      console.log(`\n正在检查：${site.name}`);
+      console.log(`   URL: ${site.url}`);
+
+      let parsedItems = [];
+      try {
+        await fetchUrl(site.url, {
+          label: site.name,
+          validate: (html) => {
+            parsedItems = site
+              .parse(html)
+              .map((item) => ({ ...item, siteIndex: site.siteIndex }));
+            if (parsedItems.length === 0) {
+              throw new Error('页面返回成功，但未解析到任何通知，可能是拦截页或页面结构变化');
+            }
+          },
+        });
+        return { site, items: parsedItems, error: null };
+      } catch (error) {
+        return { site, items: [], error };
+      }
+    })
+  );
+
+  for (const result of siteResults) {
+    const health = updateSiteHealth(state, result.site, result.error, now);
+    if (!result.error) {
+      console.log(`   ${result.site.name} 解析到 ${result.items.length} 条通知`);
+      if (health.recovered) console.log(`   ${result.site.name} 已恢复访问，故障计数已清零`);
+      allItems.push(...result.items);
+      continue;
     }
+
+    const message = errorMessage(result.error);
+    console.error(
+      `   ${result.site.name} 抓取失败：${message}（连续 ${health.consecutiveFailures} 轮）`
+    );
+    errors.push({
+      site: result.site.name,
+      siteUrl: result.site.url,
+      error: message,
+      ...health,
+    });
   }
 
   allItems.sort((a, b) => {
@@ -324,7 +509,6 @@ async function main() {
   await enrichWithDetailFingerprints(allItems);
 
   const changes = [];
-  const now = new Date().toISOString();
 
   for (const item of allItems) {
     const key = makeKey(item);
@@ -374,21 +558,36 @@ async function main() {
     console.log('\n没有新通知或内容更新。');
   }
 
-  saveState(stateFile, state);
-  console.log(`\n状态已保存到 ${stateFile}`);
-
-  if (errors.length > 0) {
-    console.log('\n部分网站检查失败，正在推送异常提醒...');
+  const alertErrors = errors.filter((error) => error.shouldAlert);
+  if (alertErrors.length > 0) {
+    console.log('\n网站已达到连续失败阈值，正在推送一次异常提醒...');
     try {
-      await pushOrThrow(token, '南医大通知监控异常', buildErrorMessage(errors));
+      await pushOrThrow(token, '南医大通知监控持续异常', buildErrorMessage(alertErrors));
+      for (const error of alertErrors) markSiteAlerted(state, error.siteUrl);
     } catch (error) {
       console.error(`异常提醒推送失败：${error.message}`);
     }
+  } else if (errors.length > 0) {
+    console.log(
+      `\n本轮故障尚未达到连续 ${FAILURE_ALERT_THRESHOLD} 轮阈值，` +
+        '暂不推送异常提醒；下轮会自动重试。'
+    );
+  }
 
+  saveState(stateFile, state);
+  console.log(`\n状态已保存到 ${stateFile}`);
+
+  const persistentErrors = errors.filter((error) => error.persistent);
+  if (persistentErrors.length > 0) {
     process.exitCode = 2;
   }
 
-  return { total: allItems.length, changes: changes.length, errors };
+  return {
+    total: allItems.length,
+    changes: changes.length,
+    errors,
+    persistentErrors,
+  };
 }
 
 if (require.main === module) {
@@ -398,4 +597,13 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, SITES };
+module.exports = {
+  main,
+  SITES,
+  fetchUrl,
+  parseAdmissionsList,
+  parseGraduateSchoolList,
+  updateSiteHealth,
+  markSiteAlerted,
+  buildErrorMessage,
+};

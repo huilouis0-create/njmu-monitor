@@ -8,15 +8,20 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: njmu-monitor
+  cancel-in-progress: false
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: 设置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -27,6 +32,9 @@ jobs:
           else
             echo "📝 state.json 不存在，首次运行将自动创建"
           fi
+
+      - name: 运行测试
+        run: node --test monitor.test.js
 
       - name: 运行监控脚本
         env:
