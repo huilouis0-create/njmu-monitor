@@ -303,22 +303,22 @@
   "health": {
     "https://yjsy.njmu.edu.cn/tzgg_19149/list.htm": {
       "siteName": "研究生院 - 通知公告",
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-08-07T20:33:25.725Z",
+      "lastCheckedAt": "2026-08-07T21:32:17.210Z",
       "lastSuccessAt": "2026-08-07T20:33:25.725Z",
-      "lastFailureAt": "2026-08-05T15:10:12.320Z",
-      "lastError": null
+      "lastFailureAt": "2026-08-07T21:32:17.210Z",
+      "lastError": "研究生院 - 通知公告 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     },
     "https://yjszs.njmu.edu.cn/10166/list.htm": {
       "siteName": "研究生招生网 - 招生动态",
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-08-07T20:33:25.725Z",
+      "lastCheckedAt": "2026-08-07T21:32:17.210Z",
       "lastSuccessAt": "2026-08-07T20:33:25.725Z",
-      "lastFailureAt": null,
-      "lastError": null
+      "lastFailureAt": "2026-08-07T21:32:17.210Z",
+      "lastError": "研究生招生网 - 招生动态 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     }
   },
-  "updatedAt": "2026-08-07T20:33:30.772Z"
+  "updatedAt": "2026-08-07T21:32:47.734Z"
 }
