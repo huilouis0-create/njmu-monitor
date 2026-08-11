@@ -1,12 +1,13 @@
 /**
- * 南京医科大学研究生网站通知监控脚本
+ * 南京医科大学网站通知监控脚本
  *
- * 监控两个网站：
+ * 监控三个网站：
  *   1. 研究生招生网 - 招生动态: https://yjszs.njmu.edu.cn/10166/list.htm
  *   2. 研究生院 - 通知公告: https://yjsy.njmu.edu.cn/tzgg_19149/list.htm
+ *   3. 教学管理处 - 教学运行: https://jxglc.njmu.edu.cn/20051/list.htm
  *
  * 可靠性策略：
- *   - 两个列表页并行抓取，单次短暂故障只记录，连续失败才告警。
+ *   - 列表页并行抓取，单次短暂故障只记录，连续失败才告警。
  *   - 新通知只有在 PushPlus 推送成功后才写入 state，避免漏推。
  *   - 对列表中的近期通知抓取详情页内容指纹，同一个 URL 内容更新也会提醒。
  */
@@ -40,6 +41,12 @@ const SITES = [
     url: 'https://yjsy.njmu.edu.cn/tzgg_19149/list.htm',
     siteIndex: 1,
     parse: (html) => parseGraduateSchoolList(html),
+  },
+  {
+    name: '教学管理处 - 教学运行',
+    url: 'https://jxglc.njmu.edu.cn/20051/list.htm',
+    siteIndex: 2,
+    parse: (html) => parseTeachingOperationsList(html),
   },
 ];
 
@@ -80,7 +87,7 @@ function absoluteUrl(baseUrl, href) {
   return new URL(href, baseUrl).href;
 }
 
-function parseAdmissionsList(html) {
+function parseSimpleNewsList(html, baseUrl, siteIndex) {
   const items = [];
   const liRegex = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
   let match;
@@ -93,13 +100,21 @@ function parseAdmissionsList(html) {
 
     const title = decodeHtml(titleAttr ? titleAttr[1] : stripHtml(linkMatch[2])).trim();
     items.push({
-      url: absoluteUrl('https://yjszs.njmu.edu.cn/10166/list.htm', linkMatch[1]),
+      url: absoluteUrl(baseUrl, linkMatch[1]),
       title,
       date: dateMatch[1],
-      siteIndex: 0,
+      siteIndex,
     });
   }
   return dedupeItems(items);
+}
+
+function parseAdmissionsList(html) {
+  return parseSimpleNewsList(html, 'https://yjszs.njmu.edu.cn/10166/list.htm', 0);
+}
+
+function parseTeachingOperationsList(html) {
+  return parseSimpleNewsList(html, 'https://jxglc.njmu.edu.cn/20051/list.htm', 2);
 }
 
 function parseGraduateSchoolList(html) {
@@ -319,10 +334,12 @@ function updateSiteHealth(state, site, error, now, alertThreshold = FAILURE_ALER
   if (!state.health || typeof state.health !== 'object') state.health = {};
 
   const previous = state.health[site.url] || {};
+  const initialized = previous.initialized ?? Boolean(previous.lastSuccessAt);
   if (!error) {
     const recovered = Number(previous.consecutiveFailures || 0) > 0;
     state.health[site.url] = {
       siteName: site.name,
+      initialized: true,
       consecutiveFailures: 0,
       alertSent: false,
       lastCheckedAt: now,
@@ -330,13 +347,20 @@ function updateSiteHealth(state, site, error, now, alertThreshold = FAILURE_ALER
       lastFailureAt: previous.lastFailureAt || null,
       lastError: null,
     };
-    return { consecutiveFailures: 0, persistent: false, shouldAlert: false, recovered };
+    return {
+      consecutiveFailures: 0,
+      persistent: false,
+      shouldAlert: false,
+      recovered,
+      needsBaseline: !initialized,
+    };
   }
 
   const consecutiveFailures = Number(previous.consecutiveFailures || 0) + 1;
   const alertSent = Boolean(previous.alertSent);
   state.health[site.url] = {
     siteName: site.name,
+    initialized,
     consecutiveFailures,
     alertSent,
     lastCheckedAt: now,
@@ -350,6 +374,7 @@ function updateSiteHealth(state, site, error, now, alertThreshold = FAILURE_ALER
     persistent: consecutiveFailures >= alertThreshold,
     shouldAlert: consecutiveFailures >= alertThreshold && !alertSent,
     recovered: false,
+    needsBaseline: false,
   };
 }
 
@@ -406,7 +431,7 @@ function buildMessage(items) {
     groups[siteName].push(item);
   }
 
-  let html = '<h3>南医大研究生通知提醒</h3>';
+  let html = '<h3>南医大网站通知提醒</h3>';
   for (const [siteName, groupItems] of Object.entries(groups)) {
     html += `<h4>${siteName}</h4><ul>`;
     for (const item of groupItems) {
@@ -453,6 +478,7 @@ async function main() {
 
   const allItems = [];
   const errors = [];
+  const baselineSiteIndexes = new Set();
   const now = new Date().toISOString();
 
   const siteResults = await Promise.all(
@@ -485,6 +511,7 @@ async function main() {
     if (!result.error) {
       console.log(`   ${result.site.name} 解析到 ${result.items.length} 条通知`);
       if (health.recovered) console.log(`   ${result.site.name} 已恢复访问，故障计数已清零`);
+      if (health.needsBaseline) baselineSiteIndexes.add(result.site.siteIndex);
       allItems.push(...result.items);
       continue;
     }
@@ -509,6 +536,7 @@ async function main() {
   await enrichWithDetailFingerprints(allItems);
 
   const changes = [];
+  let baselineItems = 0;
 
   for (const item of allItems) {
     const key = makeKey(item);
@@ -525,7 +553,11 @@ async function main() {
     };
 
     if (!alreadySeen) {
-      changes.push({ ...item, changeType: 'new' });
+      if (baselineSiteIndexes.has(item.siteIndex)) {
+        baselineItems += 1;
+      } else {
+        changes.push({ ...item, changeType: 'new' });
+      }
     } else if (previous) {
       const contentChanged =
         item.contentHash && previous.contentHash && item.contentHash !== previous.contentHash;
@@ -540,11 +572,14 @@ async function main() {
     state.records[key] = record;
   }
 
+  if (baselineItems > 0) {
+    console.log(`\n首次接入已保存 ${baselineItems} 条现有通知作为基线，不推送历史内容。`);
+  }
   console.log(`\n统计：共 ${allItems.length} 条通知，新增/更新 ${changes.length} 条`);
 
   if (changes.length > 0) {
     const pushItems = changes.slice(0, 10);
-    const title = `南医大研究生通知 ${changes.length} 条`;
+    const title = `南医大网站通知 ${changes.length} 条`;
     console.log('\n正在推送新通知/更新通知...');
     await pushOrThrow(token, title, buildMessage(pushItems));
 
@@ -603,6 +638,7 @@ module.exports = {
   fetchUrl,
   parseAdmissionsList,
   parseGraduateSchoolList,
+  parseTeachingOperationsList,
   updateSiteHealth,
   markSiteAlerted,
   buildErrorMessage,

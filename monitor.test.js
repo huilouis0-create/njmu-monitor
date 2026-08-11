@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   parseAdmissionsList,
   parseGraduateSchoolList,
+  parseTeachingOperationsList,
   updateSiteHealth,
   markSiteAlerted,
   buildErrorMessage,
@@ -49,6 +50,27 @@ test('解析研究生院通知', () => {
   ]);
 });
 
+test('解析教学管理处教学运行通知', () => {
+  const html = `
+    <ul class="news_list list2">
+      <li class="news n1 clearfix">
+        <span class="news_title">
+          <a href='/2026/0806/c20051a305240/page.htm' title='2025级本科生转专业笔试、面试通知'>通知</a>
+        </span>
+        <span class="news_meta">2026-08-06</span>
+      </li>
+    </ul>`;
+
+  assert.deepEqual(parseTeachingOperationsList(html), [
+    {
+      url: 'https://jxglc.njmu.edu.cn/2026/0806/c20051a305240/page.htm',
+      title: '2025级本科生转专业笔试、面试通知',
+      date: '2026-08-06',
+      siteIndex: 2,
+    },
+  ]);
+});
+
 test('单次失败不告警，连续两次失败只告警一次，成功后清零', () => {
   const state = { health: {} };
   const site = { name: '测试站点', url: 'https://example.edu/list.htm' };
@@ -70,8 +92,12 @@ test('单次失败不告警，连续两次失败只告警一次，成功后清�
 
   const recovered = updateSiteHealth(state, site, null, '2026-07-30T01:30:00Z', 2);
   assert.equal(recovered.recovered, true);
+  assert.equal(recovered.needsBaseline, true);
   assert.equal(state.health[site.url].consecutiveFailures, 0);
   assert.equal(state.health[site.url].alertSent, false);
+
+  const nextSuccess = updateSiteHealth(state, site, null, '2026-07-30T02:00:00Z', 2);
+  assert.equal(nextSuccess.needsBaseline, false);
 });
 
 test('持续异常消息包含连续失败轮数', () => {
