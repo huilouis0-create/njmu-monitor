@@ -448,33 +448,33 @@
     "https://jxglc.njmu.edu.cn/20051/list.htm": {
       "siteName": "教学管理处 - 教学运行",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-08-20T22:52:56.041Z",
+      "lastCheckedAt": "2026-08-20T23:19:02.158Z",
       "lastSuccessAt": "2026-08-20T22:52:56.041Z",
-      "lastFailureAt": "2026-08-20T11:50:48.921Z",
-      "lastError": null
+      "lastFailureAt": "2026-08-20T23:19:02.158Z",
+      "lastError": "教学管理处 - 教学运行 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     },
     "https://yjsy.njmu.edu.cn/tzgg_19149/list.htm": {
       "siteName": "研究生院 - 通知公告",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-08-20T22:52:56.041Z",
+      "lastCheckedAt": "2026-08-20T23:19:02.158Z",
       "lastSuccessAt": "2026-08-20T22:52:56.041Z",
-      "lastFailureAt": "2026-08-20T11:50:48.921Z",
-      "lastError": null
+      "lastFailureAt": "2026-08-20T23:19:02.158Z",
+      "lastError": "研究生院 - 通知公告 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     },
     "https://yjszs.njmu.edu.cn/10166/list.htm": {
       "siteName": "研究生招生网 - 招生动态",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-08-20T22:52:56.041Z",
+      "lastCheckedAt": "2026-08-20T23:19:02.158Z",
       "lastSuccessAt": "2026-08-20T22:52:56.041Z",
-      "lastFailureAt": "2026-08-20T16:33:49.336Z",
-      "lastError": null
+      "lastFailureAt": "2026-08-20T23:19:02.158Z",
+      "lastError": "研究生招生网 - 招生动态 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     }
   },
-  "updatedAt": "2026-08-20T22:53:02.166Z"
+  "updatedAt": "2026-08-20T23:19:33.304Z"
 }
