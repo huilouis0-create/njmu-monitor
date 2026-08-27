@@ -5,6 +5,7 @@ const {
   parseAdmissionsList,
   parseGraduateSchoolList,
   parseTeachingOperationsList,
+  parseFirstClinicalSchoolAnnouncementsList,
   updateSiteHealth,
   markSiteAlerted,
   buildErrorMessage,
@@ -67,6 +68,28 @@ test('解析教学管理处教学运行通知', () => {
       title: '2025级本科生转专业笔试、面试通知',
       date: '2026-08-06',
       siteIndex: 2,
+    },
+  ]);
+});
+
+test('解析第一临床医学院通知公告', () => {
+  const html = `
+    <ul class="news_list list2">
+      <li class="news n1 clearfix">
+        <span class="news_title">
+          <a href='/2024/0527/c20747a264569/page.htm' target='_blank'
+             title='关于推荐四位同学申报2024年度最具影响力本科毕业生的公示'>公告</a>
+        </span>
+        <span class="news_meta">2024-05-27</span>
+      </li>
+    </ul>`;
+
+  assert.deepEqual(parseFirstClinicalSchoolAnnouncementsList(html), [
+    {
+      url: 'https://dylc.njmu.edu.cn/2024/0527/c20747a264569/page.htm',
+      title: '关于推荐四位同学申报2024年度最具影响力本科毕业生的公示',
+      date: '2024-05-27',
+      siteIndex: 3,
     },
   ]);
 });

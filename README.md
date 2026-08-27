@@ -9,6 +9,7 @@
 | 🎓 研究生招生网 - 招生动态 | https://yjszs.njmu.edu.cn/10166/list.htm |
 | 📋 研究生院 - 通知公告 | https://yjsy.njmu.edu.cn/tzgg_19149/list.htm |
 | 📚 教学管理处 - 教学运行 | https://jxglc.njmu.edu.cn/20051/list.htm |
+| 🏥 第一临床医学院 - 通知公告 | https://dylc.njmu.edu.cn/20747/list.htm |
 
 ## 工作原理
 

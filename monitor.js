@@ -1,10 +1,11 @@
 /**
  * 南京医科大学网站通知监控脚本
  *
- * 监控三个网站：
+ * 监控四个网站：
  *   1. 研究生招生网 - 招生动态: https://yjszs.njmu.edu.cn/10166/list.htm
  *   2. 研究生院 - 通知公告: https://yjsy.njmu.edu.cn/tzgg_19149/list.htm
  *   3. 教学管理处 - 教学运行: https://jxglc.njmu.edu.cn/20051/list.htm
+ *   4. 第一临床医学院 - 通知公告: https://dylc.njmu.edu.cn/20747/list.htm
  *
  * 可靠性策略：
  *   - 列表页并行抓取，单次短暂故障只记录，连续失败才告警。
@@ -47,6 +48,12 @@ const SITES = [
     url: 'https://jxglc.njmu.edu.cn/20051/list.htm',
     siteIndex: 2,
     parse: (html) => parseTeachingOperationsList(html),
+  },
+  {
+    name: '第一临床医学院 - 通知公告',
+    url: 'https://dylc.njmu.edu.cn/20747/list.htm',
+    siteIndex: 3,
+    parse: (html) => parseFirstClinicalSchoolAnnouncementsList(html),
   },
 ];
 
@@ -115,6 +122,10 @@ function parseAdmissionsList(html) {
 
 function parseTeachingOperationsList(html) {
   return parseSimpleNewsList(html, 'https://jxglc.njmu.edu.cn/20051/list.htm', 2);
+}
+
+function parseFirstClinicalSchoolAnnouncementsList(html) {
+  return parseSimpleNewsList(html, 'https://dylc.njmu.edu.cn/20747/list.htm', 3);
 }
 
 function parseGraduateSchoolList(html) {
@@ -186,7 +197,8 @@ function requestOnce(url, timeoutMs, redirectsLeft = MAX_REDIRECTS) {
       family: 4,
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 AppleWebKit monitor',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         'Cache-Control': 'no-cache',
@@ -639,6 +651,7 @@ module.exports = {
   parseAdmissionsList,
   parseGraduateSchoolList,
   parseTeachingOperationsList,
+  parseFirstClinicalSchoolAnnouncementsList,
   updateSiteHealth,
   markSiteAlerted,
   buildErrorMessage,
