@@ -574,43 +574,43 @@
     "https://dylc.njmu.edu.cn/20747/list.htm": {
       "siteName": "第一临床医学院 - 通知公告",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-01T15:54:13.044Z",
+      "lastCheckedAt": "2026-09-01T19:06:58.451Z",
       "lastSuccessAt": "2026-09-01T15:54:13.044Z",
-      "lastFailureAt": "2026-08-31T17:09:57.883Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-01T19:06:58.451Z",
+      "lastError": "第一临床医学院 - 通知公告 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     },
     "https://jxglc.njmu.edu.cn/20051/list.htm": {
       "siteName": "教学管理处 - 教学运行",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-01T15:54:13.044Z",
+      "lastCheckedAt": "2026-09-01T19:06:58.451Z",
       "lastSuccessAt": "2026-09-01T15:54:13.044Z",
-      "lastFailureAt": "2026-08-31T17:09:57.883Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-01T19:06:58.451Z",
+      "lastError": "教学管理处 - 教学运行 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     },
     "https://yjsy.njmu.edu.cn/tzgg_19149/list.htm": {
       "siteName": "研究生院 - 通知公告",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-01T15:54:13.044Z",
+      "lastCheckedAt": "2026-09-01T19:06:58.451Z",
       "lastSuccessAt": "2026-09-01T15:54:13.044Z",
-      "lastFailureAt": "2026-08-31T17:09:57.883Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-01T19:06:58.451Z",
+      "lastError": "研究生院 - 通知公告 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     },
     "https://yjszs.njmu.edu.cn/10166/list.htm": {
       "siteName": "研究生招生网 - 招生动态",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-01T15:54:13.044Z",
+      "lastCheckedAt": "2026-09-01T19:06:58.451Z",
       "lastSuccessAt": "2026-09-01T15:54:13.044Z",
-      "lastFailureAt": "2026-08-31T17:09:57.883Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-01T19:06:58.451Z",
+      "lastError": "研究生招生网 - 招生动态 连续 3 次抓取失败：ETIMEDOUT: socket timeout after 30000ms"
     }
   },
-  "updatedAt": "2026-09-01T15:54:22.229Z"
+  "updatedAt": "2026-09-01T19:07:29.422Z"
 }
