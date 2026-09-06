@@ -173,8 +173,20 @@ function requestOnce(url, timeoutMs, redirectsLeft = MAX_REDIRECTS) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const client = urlObj.protocol === 'https:' ? https : http;
+    const startedAt = Date.now();
+    let phase = 'dns/tcp';
     let settled = false;
     let req;
+
+    const timeoutError = (kind) => {
+      const elapsedMs = Date.now() - startedAt;
+      const error = new Error(
+        `${kind} timeout after ${elapsedMs}ms ` +
+          `(limit=${timeoutMs}ms, phase=${phase}, host=${urlObj.hostname})`
+      );
+      error.code = 'ETIMEDOUT';
+      return error;
+    };
 
     const finish = (callback, value) => {
       if (settled) return;
@@ -184,9 +196,7 @@ function requestOnce(url, timeoutMs, redirectsLeft = MAX_REDIRECTS) {
     };
 
     const overallTimer = setTimeout(() => {
-      const error = new Error(`request timeout after ${timeoutMs}ms`);
-      error.code = 'ETIMEDOUT';
-      req?.destroy(error);
+      req?.destroy(timeoutError('request'));
     }, timeoutMs);
 
     const options = {
@@ -195,6 +205,9 @@ function requestOnce(url, timeoutMs, redirectsLeft = MAX_REDIRECTS) {
       path: urlObj.pathname + urlObj.search,
       method: 'GET',
       family: 4,
+      // Set the socket timeout before DNS/TCP connect. req.setTimeout() alone
+      // waits for connect, leaving the global Agent's default 5s timeout active.
+      timeout: timeoutMs,
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
@@ -206,6 +219,7 @@ function requestOnce(url, timeoutMs, redirectsLeft = MAX_REDIRECTS) {
     };
 
     req = client.request(options, (res) => {
+      phase = 'response-body';
       const statusCode = res.statusCode || 0;
       if (statusCode >= 300 && statusCode < 400 && res.headers.location) {
         res.resume();
@@ -235,11 +249,22 @@ function requestOnce(url, timeoutMs, redirectsLeft = MAX_REDIRECTS) {
       res.on('error', (error) => finish(reject, error));
     });
 
+    req.on('socket', (socket) => {
+      if (!socket.connecting) {
+        phase = 'waiting-response';
+        return;
+      }
+      socket.once('lookup', () => { phase = 'tcp'; });
+      socket.once('connect', () => {
+        phase = urlObj.protocol === 'https:' ? 'tls' : 'waiting-response';
+      });
+      if (urlObj.protocol === 'https:') {
+        socket.once('secureConnect', () => { phase = 'waiting-response'; });
+      }
+    });
     req.on('error', (error) => finish(reject, error));
     req.setTimeout(timeoutMs, () => {
-      const error = new Error(`socket timeout after ${timeoutMs}ms`);
-      error.code = 'ETIMEDOUT';
-      req.destroy(error);
+      req.destroy(timeoutError('socket'));
     });
     req.end();
   });
@@ -458,7 +483,7 @@ function buildMessage(items) {
 function buildErrorMessage(errors) {
   let html =
     '<h3>南医大通知监控持续异常</h3>' +
-    '<p>学校网站已连续多轮无法访问，已排除单次网络抖动。程序会继续自动重试。</p><ul>';
+    '<p>监控程序已连续多轮未能完成以下网站的访问，可能与运行节点网络、学校服务或页面异常有关。程序会继续自动重试。</p><ul>';
   for (const error of errors) {
     html +=
       `<li>${error.site}：连续 ${error.consecutiveFailures} 轮失败` +

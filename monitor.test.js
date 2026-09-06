@@ -1,7 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 
 const {
+  fetchUrl,
   parseAdmissionsList,
   parseGraduateSchoolList,
   parseTeachingOperationsList,
@@ -10,6 +12,88 @@ const {
   markSiteAlerted,
   buildErrorMessage,
 } = require('./monitor');
+
+async function localServer(t, handler) {
+  const server = http.createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => {
+    server.closeAllConnections();
+    server.close(resolve);
+  }));
+  return server;
+}
+
+test('慢 DNS 超过 Agent 默认超时后，在请求时限内仍能成功', async (t) => {
+  const server = await localServer(t, (req, res) => res.end('notice list'));
+  const originalAgent = http.globalAgent;
+  // Scale the production 5s Agent timeout down to 50ms. DNS takes 150ms,
+  // comfortably within the explicit 1s request deadline.
+  const agent = new http.Agent({
+    keepAlive: true,
+    timeout: 50,
+    lookup: (hostname, options, callback) => {
+      setTimeout(() => callback(null, '127.0.0.1', 4), 150);
+    },
+  });
+  http.globalAgent = agent;
+  t.after(() => {
+    http.globalAgent = originalAgent;
+    agent.destroy();
+  });
+
+  const body = await fetchUrl(`http://slow-dns.test:${server.address().port}/`, {
+    attempts: 1,
+    timeoutMs: 1000,
+  });
+  assert.equal(body, 'notice list');
+});
+
+test('服务器无响应时仍按请求时限终止', async (t) => {
+  const server = await localServer(t, () => {});
+  const start = Date.now();
+  await assert.rejects(
+    fetchUrl(`http://127.0.0.1:${server.address().port}/`, { attempts: 1, timeoutMs: 1000 }),
+    (error) => {
+      assert.equal(error.code, 'ETIMEDOUT');
+      assert.match(error.message, /timeout after \d+ms/);
+      assert.match(error.message, /limit=1000ms, phase=waiting-response, host=127\.0\.0\.1/);
+      return true;
+    }
+  );
+  assert.ok(Date.now() - start >= 900, '不得提前触发默认短超时');
+});
+
+test('DNS 一直不返回时，总时限仍能终止请求', async (t) => {
+  const originalAgent = http.globalAgent;
+  const agent = new http.Agent({ keepAlive: true, timeout: 50, lookup: () => {} });
+  http.globalAgent = agent;
+  t.after(() => {
+    http.globalAgent = originalAgent;
+    agent.destroy();
+  });
+  const start = Date.now();
+  await assert.rejects(
+    fetchUrl('http://stalled-dns.test/', { attempts: 1, timeoutMs: 1000 }),
+    (error) => {
+      assert.equal(error.code, 'ETIMEDOUT');
+      assert.match(error.message, /phase=dns\/tcp/);
+      return true;
+    }
+  );
+  assert.ok(Date.now() - start >= 900, 'DNS 阶段也应使用显式请求时限');
+});
+
+test('响应正文未完成时，总时限仍能终止请求', async (t) => {
+  const server = await localServer(t, (req, res) => res.write('partial notice'));
+  await assert.rejects(
+    fetchUrl(`http://127.0.0.1:${server.address().port}/`, { attempts: 1, timeoutMs: 1000 }),
+    (error) => {
+      assert.equal(error.code, 'ETIMEDOUT');
+      assert.match(error.message, /phase=response-body/);
+      return true;
+    }
+  );
+});
 
 test('解析研究生招生网通知并去重', () => {
   const html = `
@@ -129,4 +213,5 @@ test('持续异常消息包含连续失败轮数', () => {
   ]);
   assert.match(html, /连续 2 轮失败/);
   assert.match(html, /ETIMEDOUT/);
+  assert.doesNotMatch(html, /已排除/);
 });
