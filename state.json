@@ -790,43 +790,43 @@
     "https://dylc.njmu.edu.cn/20747/list.htm": {
       "siteName": "第一临床医学院 - 通知公告",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-25T18:48:54.515Z",
+      "lastCheckedAt": "2026-09-25T21:55:17.618Z",
       "lastSuccessAt": "2026-09-25T18:48:54.515Z",
-      "lastFailureAt": "2026-09-21T20:43:09.464Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-25T21:55:17.618Z",
+      "lastError": "第一临床医学院 - 通知公告 连续 3 次抓取失败：ETIMEDOUT: request timeout after 30026ms (limit=30000ms, phase=tcp, host=dylc.njmu.edu.cn)"
     },
     "https://jxglc.njmu.edu.cn/20051/list.htm": {
       "siteName": "教学管理处 - 教学运行",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-25T18:48:54.515Z",
+      "lastCheckedAt": "2026-09-25T21:55:17.618Z",
       "lastSuccessAt": "2026-09-25T18:48:54.515Z",
-      "lastFailureAt": "2026-09-21T20:43:09.464Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-25T21:55:17.618Z",
+      "lastError": "教学管理处 - 教学运行 连续 3 次抓取失败：ETIMEDOUT: request timeout after 30027ms (limit=30000ms, phase=tcp, host=jxglc.njmu.edu.cn)"
     },
     "https://yjsy.njmu.edu.cn/tzgg_19149/list.htm": {
       "siteName": "研究生院 - 通知公告",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-25T18:48:54.515Z",
+      "lastCheckedAt": "2026-09-25T21:55:17.618Z",
       "lastSuccessAt": "2026-09-25T18:48:54.515Z",
-      "lastFailureAt": "2026-09-21T20:43:09.464Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-25T21:55:17.618Z",
+      "lastError": "研究生院 - 通知公告 连续 3 次抓取失败：ETIMEDOUT: request timeout after 30028ms (limit=30000ms, phase=tcp, host=yjsy.njmu.edu.cn)"
     },
     "https://yjszs.njmu.edu.cn/10166/list.htm": {
       "siteName": "研究生招生网 - 招生动态",
       "initialized": true,
-      "consecutiveFailures": 0,
+      "consecutiveFailures": 1,
       "alertSent": false,
-      "lastCheckedAt": "2026-09-25T18:48:54.515Z",
+      "lastCheckedAt": "2026-09-25T21:55:17.618Z",
       "lastSuccessAt": "2026-09-25T18:48:54.515Z",
-      "lastFailureAt": "2026-09-23T20:56:19.375Z",
-      "lastError": null
+      "lastFailureAt": "2026-09-25T21:55:17.618Z",
+      "lastError": "研究生招生网 - 招生动态 连续 3 次抓取失败：ETIMEDOUT: request timeout after 30030ms (limit=30000ms, phase=tcp, host=yjszs.njmu.edu.cn)"
     }
   },
-  "updatedAt": "2026-09-25T18:49:03.246Z"
+  "updatedAt": "2026-09-25T21:57:02.710Z"
 }
