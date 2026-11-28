@@ -4,7 +4,6 @@ const http = require('node:http');
 
 const {
   fetchUrl,
-  parseAdmissionsList,
   parseGraduateSchoolList,
   parseTeachingOperationsList,
   parseFirstClinicalSchoolAnnouncementsList,
@@ -95,29 +94,6 @@ test('响应正文未完成时，总时限仍能终止请求', async (t) => {
   );
 });
 
-test('解析研究生招生网通知并去重', () => {
-  const html = `
-    <ul>
-      <li class="news n1 clearfix">
-        <a href="/2026/0730/c10166a123/page.htm" title="招生通知 &amp; 补充说明">通知</a>
-        <span class="news_meta">2026-07-30</span>
-      </li>
-      <li>
-        <a href="/2026/0730/c10166a123/page.htm">重复通知</a>
-        <span>2026-07-30</span>
-      </li>
-    </ul>`;
-
-  assert.deepEqual(parseAdmissionsList(html), [
-    {
-      url: 'https://yjszs.njmu.edu.cn/2026/0730/c10166a123/page.htm',
-      title: '招生通知 & 补充说明',
-      date: '2026-07-30',
-      siteIndex: 0,
-    },
-  ]);
-});
-
 test('解析研究生院通知', () => {
   const html = `
     <div class="jzlb clearfix">
@@ -130,7 +106,7 @@ test('解析研究生院通知', () => {
       url: 'https://yjsy.njmu.edu.cn/2026/0729/c19149a456/page.htm',
       title: '培养工作通知',
       date: '2026-07-29',
-      siteIndex: 1,
+      siteIndex: 0,
     },
   ]);
 });
@@ -151,7 +127,7 @@ test('解析教学管理处教学运行通知', () => {
       url: 'https://jxglc.njmu.edu.cn/2026/0806/c20051a305240/page.htm',
       title: '2025级本科生转专业笔试、面试通知',
       date: '2026-08-06',
-      siteIndex: 2,
+      siteIndex: 1,
     },
   ]);
 });
@@ -173,7 +149,7 @@ test('解析第一临床医学院通知公告', () => {
       url: 'https://dylc.njmu.edu.cn/2024/0527/c20747a264569/page.htm',
       title: '关于推荐四位同学申报2024年度最具影响力本科毕业生的公示',
       date: '2024-05-27',
-      siteIndex: 3,
+      siteIndex: 2,
     },
   ]);
 });
