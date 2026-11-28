@@ -6,7 +6,6 @@
 
 | 网站 | 链接 |
 |------|------|
-| 🎓 研究生招生网 - 招生动态 | https://yjszs.njmu.edu.cn/10166/list.htm |
 | 📋 研究生院 - 通知公告 | https://yjsy.njmu.edu.cn/tzgg_19149/list.htm |
 | 📚 教学管理处 - 教学运行 | https://jxglc.njmu.edu.cn/20051/list.htm |
 | 🏥 第一临床医学院 - 通知公告 | https://dylc.njmu.edu.cn/20747/list.htm |
@@ -113,12 +112,7 @@ node monitor.js
 收到微信消息后，会显示：
 
 ```
-📢 南医大新通知 (3条)
-
-【研究生招生网】
-  • 南京医科大学2026年...
-    日期: 2026-06-26
-    链接: https://yjszs.njmu.edu.cn/...
+📢 南医大新通知 (2条)
 
 【研究生院】
   • 关于做好2026级...
