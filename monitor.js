@@ -1,11 +1,12 @@
 /**
  * 南京医科大学网站通知监控脚本
  *
- * 监控四个网站：
- *   1. 研究生招生网 - 招生动态: https://yjszs.njmu.edu.cn/10166/list.htm
- *   2. 研究生院 - 通知公告: https://yjsy.njmu.edu.cn/tzgg_19149/list.htm
- *   3. 教学管理处 - 教学运行: https://jxglc.njmu.edu.cn/20051/list.htm
- *   4. 第一临床医学院 - 通知公告: https://dylc.njmu.edu.cn/20747/list.htm
+ * 监控三个网站：
+ *   1. 研究生院 - 通知公告: https://yjsy.njmu.edu.cn/tzgg_19149/list.htm
+ *   2. 教学管理处 - 教学运行: https://jxglc.njmu.edu.cn/20051/list.htm
+ *   3. 第一临床医学院 - 通知公告: https://dylc.njmu.edu.cn/20747/list.htm
+ *
+ * 注：研究生招生网（yjszs.njmu.edu.cn）已按要求停止监控。
  *
  * 可靠性策略：
  *   - 列表页并行抓取，单次短暂故障只记录，连续失败才告警。
@@ -32,27 +33,21 @@ const MAX_REDIRECTS = 5;
 
 const SITES = [
   {
-    name: '研究生招生网 - 招生动态',
-    url: 'https://yjszs.njmu.edu.cn/10166/list.htm',
-    siteIndex: 0,
-    parse: (html) => parseAdmissionsList(html),
-  },
-  {
     name: '研究生院 - 通知公告',
     url: 'https://yjsy.njmu.edu.cn/tzgg_19149/list.htm',
-    siteIndex: 1,
+    siteIndex: 0,
     parse: (html) => parseGraduateSchoolList(html),
   },
   {
     name: '教学管理处 - 教学运行',
     url: 'https://jxglc.njmu.edu.cn/20051/list.htm',
-    siteIndex: 2,
+    siteIndex: 1,
     parse: (html) => parseTeachingOperationsList(html),
   },
   {
     name: '第一临床医学院 - 通知公告',
     url: 'https://dylc.njmu.edu.cn/20747/list.htm',
-    siteIndex: 3,
+    siteIndex: 2,
     parse: (html) => parseFirstClinicalSchoolAnnouncementsList(html),
   },
 ];
@@ -116,16 +111,12 @@ function parseSimpleNewsList(html, baseUrl, siteIndex) {
   return dedupeItems(items);
 }
 
-function parseAdmissionsList(html) {
-  return parseSimpleNewsList(html, 'https://yjszs.njmu.edu.cn/10166/list.htm', 0);
-}
-
 function parseTeachingOperationsList(html) {
-  return parseSimpleNewsList(html, 'https://jxglc.njmu.edu.cn/20051/list.htm', 2);
+  return parseSimpleNewsList(html, 'https://jxglc.njmu.edu.cn/20051/list.htm', 1);
 }
 
 function parseFirstClinicalSchoolAnnouncementsList(html) {
-  return parseSimpleNewsList(html, 'https://dylc.njmu.edu.cn/20747/list.htm', 3);
+  return parseSimpleNewsList(html, 'https://dylc.njmu.edu.cn/20747/list.htm', 2);
 }
 
 function parseGraduateSchoolList(html) {
@@ -142,7 +133,7 @@ function parseGraduateSchoolList(html) {
       url: absoluteUrl('https://yjsy.njmu.edu.cn/tzgg_19149/list.htm', linkMatch[1]),
       title: stripHtml(linkMatch[2]),
       date: dateMatch[1],
-      siteIndex: 1,
+      siteIndex: 0,
     });
   }
 
@@ -154,7 +145,7 @@ function parseGraduateSchoolList(html) {
       url: absoluteUrl('https://yjsy.njmu.edu.cn/tzgg_19149/list.htm', match[1]),
       title: stripHtml(match[2]),
       date: match[3],
-      siteIndex: 1,
+      siteIndex: 0,
     });
   }
   return dedupeItems(items);
@@ -673,7 +664,6 @@ module.exports = {
   main,
   SITES,
   fetchUrl,
-  parseAdmissionsList,
   parseGraduateSchoolList,
   parseTeachingOperationsList,
   parseFirstClinicalSchoolAnnouncementsList,
